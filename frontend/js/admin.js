@@ -7,6 +7,41 @@
 let diseaseChartInstance = null;
 let monthlyChartInstance = null;
 
+const DESKTOP_CHART_HEIGHT = 320;
+const MOBILE_CHART_HEIGHT = 280;
+
+function getChartHeight() {
+    return window.matchMedia('(max-width: 768px)').matches ? MOBILE_CHART_HEIGHT : DESKTOP_CHART_HEIGHT;
+}
+
+function destroyChart(canvas, chartInstance) {
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart && existingChart !== chartInstance) {
+        existingChart.destroy();
+    }
+
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+}
+
+function prepareChartCanvas(canvas) {
+    const chartHeight = getChartHeight();
+    const parent = canvas.parentElement;
+
+    if (parent) {
+        parent.style.height = `${chartHeight}px`;
+        parent.style.minHeight = `${chartHeight}px`;
+        parent.style.maxHeight = `${chartHeight}px`;
+    }
+
+    canvas.height = chartHeight;
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = `${chartHeight}px`;
+    canvas.style.maxHeight = `${chartHeight}px`;
+}
+
 /**
  * Load admin dashboard data
  */
@@ -53,13 +88,11 @@ function renderDiseaseChart(diseases) {
     const canvas = document.getElementById('diseaseChart');
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    destroyChart(canvas, diseaseChartInstance);
+    diseaseChartInstance = null;
+    prepareChartCanvas(canvas);
 
-    // CRITICAL FIX: Destroy existing chart before creating new one
-    if (diseaseChartInstance) {
-        diseaseChartInstance.destroy();
-        diseaseChartInstance = null;
-    }
+    const ctx = canvas.getContext('2d');
 
     // Handle empty data
     if (!diseases || diseases.length === 0) {
@@ -76,6 +109,10 @@ function renderDiseaseChart(diseases) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                devicePixelRatio: 1,
+                resizeDelay: 200,
+                animation: false,
+                layout: { padding: 0 },
                 plugins: {
                     legend: { display: false }
                 }
@@ -106,6 +143,10 @@ function renderDiseaseChart(diseases) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: 1,
+            resizeDelay: 200,
+            animation: false,
+            layout: { padding: 0 },
             plugins: {
                 legend: {
                     position: 'right',
@@ -139,13 +180,11 @@ function renderMonthlyChart(stats) {
     const canvas = document.getElementById('monthlyChart');
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    destroyChart(canvas, monthlyChartInstance);
+    monthlyChartInstance = null;
+    prepareChartCanvas(canvas);
 
-    // CRITICAL FIX: Destroy existing chart before creating new one
-    if (monthlyChartInstance) {
-        monthlyChartInstance.destroy();
-        monthlyChartInstance = null;
-    }
+    const ctx = canvas.getContext('2d');
 
     // Handle empty data
     if (!stats || stats.length === 0) {
@@ -161,7 +200,11 @@ function renderMonthlyChart(stats) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                devicePixelRatio: 1,
+                resizeDelay: 200,
+                animation: false,
+                layout: { padding: 0 }
             }
         });
         return;
@@ -210,6 +253,10 @@ function renderMonthlyChart(stats) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: 1,
+            resizeDelay: 200,
+            animation: false,
+            layout: { padding: 0 },
             interaction: {
                 intersect: false,
                 mode: 'index'

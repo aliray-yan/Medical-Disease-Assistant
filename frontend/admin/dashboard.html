@@ -7,6 +7,36 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .admin-chart-shell {
+            position: relative;
+            height: 320px;
+            min-height: 320px;
+            max-height: 320px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .admin-chart-shell canvas {
+            display: block;
+            width: 100% !important;
+            height: 320px !important;
+            max-height: 320px !important;
+        }
+
+        @media (max-width: 768px) {
+            .admin-chart-shell {
+                height: 280px;
+                min-height: 280px;
+                max-height: 280px;
+            }
+
+            .admin-chart-shell canvas {
+                height: 280px !important;
+                max-height: 280px !important;
+            }
+        }
+    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -153,13 +183,17 @@
                 <!-- Disease Distribution Chart -->
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Disease Distribution</h3>
-                    <canvas id="diseaseChart" height="300"></canvas>
+                    <div class="admin-chart-shell">
+                        <canvas id="diseaseChart" height="320"></canvas>
+                    </div>
                 </div>
 
                 <!-- Monthly Activity Chart -->
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Activity</h3>
-                    <canvas id="monthlyChart" height="300"></canvas>
+                    <div class="admin-chart-shell">
+                        <canvas id="monthlyChart" height="320"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -194,7 +228,7 @@
 
     <script src="../js/app.js"></script>
     <script src="../js/auth.js"></script>
-    <script src="../js/admin.js"></script>
+    <script src="../js/admin.js?v=chart-size-fix-2"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             checkAuth('admin');
