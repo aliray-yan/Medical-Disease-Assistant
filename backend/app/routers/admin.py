@@ -23,35 +23,34 @@ from app.auth import get_password_hash
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 
-@router.get("/dashboard", response_model=DashboardStats)
+@router.get("/dashboard")
 async def get_admin_dashboard(
     current_user: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """Get admin dashboard statistics"""
-    
+
     today = datetime.utcnow().date()
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    
+
     # Basic counts
     total_patients = db.query(Patient).count()
     total_doctors = db.query(Doctor).count()
     total_predictions = db.query(DiseasePrediction).count()
     total_appointments = db.query(Appointment).count()
-    
+
     # Today's counts
     predictions_today = db.query(DiseasePrediction).filter(
         func.date(DiseasePrediction.prediction_date) == today
     ).count()
-    
+
     appointments_today = db.query(Appointment).filter(
         Appointment.appointment_date == today
     ).count()
-    
+
     pending_appointments = db.query(Appointment).filter(
         Appointment.status == AppointmentStatus.PENDING
     ).count()
-    
+
     # Most common diseases
     common_diseases = db.query(
         DiseasePrediction.predicted_disease,
@@ -59,36 +58,60 @@ async def get_admin_dashboard(
     ).group_by(DiseasePrediction.predicted_disease).order_by(
         desc('count')
     ).limit(10).all()
-    
+
     # Recent predictions
     recent_predictions = db.query(DiseasePrediction).join(
         Patient
     ).join(User).order_by(
         desc(DiseasePrediction.prediction_date)
     ).limit(10).all()
-    
-    # Monthly stats
+
+    # ===== FIXED MONTHLY STATS =====
+    # Use explicit date boundaries to avoid accumulation bugs
     monthly_stats = []
-    for i in range(6):
-        month_start = (datetime.utcnow().replace(day=1) - timedelta(days=30*i)).replace(day=1)
-        month_end = (month_start + timedelta(days=32)).replace(day=1)
-        
+    now = datetime.utcnow()
+
+    for i in range(5, -1, -1):  # 5 months ago to current month (6 months total)
+        # Calculate exact month boundaries
+        year = now.year
+        month = now.month - i
+
+        # Handle year rollover
+        while month <= 0:
+            month += 12
+            year -= 1
+
+        # First day of this month
+        month_start = datetime(year, month, 1)
+
+        # First day of next month
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1)
+        else:
+            month_end = datetime(year, month + 1, 1)
+
+        # Count predictions in this month
         month_predictions = db.query(DiseasePrediction).filter(
             DiseasePrediction.prediction_date >= month_start,
             DiseasePrediction.prediction_date < month_end
         ).count()
-        
+
+        # Count appointments created in this month
         month_appointments = db.query(Appointment).filter(
             Appointment.created_at >= month_start,
             Appointment.created_at < month_end
         ).count()
-        
+
+        # Short month label like "Jan 2025"
+        month_label = month_start.strftime("%b %Y")
+
         monthly_stats.append({
-            "month": month_start.strftime("%B %Y"),
+            "month": month_label,
             "predictions": month_predictions,
             "appointments": month_appointments
         })
-    
+    # ===== END FIXED MONTHLY STATS =====
+
     return {
         "total_patients": total_patients,
         "total_doctors": total_doctors,
@@ -109,7 +132,7 @@ async def get_admin_dashboard(
                 "date": p.prediction_date.isoformat()
             } for p in recent_predictions
         ],
-        "monthly_stats": monthly_stats[::-1]  # Reverse to show oldest first
+        "monthly_stats": monthly_stats  # Already in correct order (oldest first)
     }
 
 

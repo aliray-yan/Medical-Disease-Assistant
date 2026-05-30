@@ -3,8 +3,9 @@
  * Handles admin-specific functionality
  */
 
-let diseaseChart = null;
-let monthlyChart = null;
+// Chart instances - MUST track these to destroy before recreating
+let diseaseChartInstance = null;
+let monthlyChartInstance = null;
 
 /**
  * Load admin dashboard data
@@ -27,19 +28,17 @@ async function loadAdminDashboard() {
 
 /**
  * Render admin dashboard data
- * @param {object} data - Dashboard data
+ * @param {object} data - Dashboard data from API
  */
 function renderAdminDashboard(data) {
-    // Update stats
+    // Update stat cards
     document.getElementById('totalPatients').textContent = data.total_patients;
     document.getElementById('totalDoctors').textContent = data.total_doctors;
     document.getElementById('totalPredictions').textContent = data.total_predictions;
     document.getElementById('todayActivity').textContent = data.predictions_today + data.appointments_today;
 
-    // Render disease distribution chart
+    // Render charts - DESTROY old ones first
     renderDiseaseChart(data.common_diseases);
-
-    // Render monthly activity chart
     renderMonthlyChart(data.monthly_stats);
 
     // Render recent predictions table
@@ -47,33 +46,61 @@ function renderAdminDashboard(data) {
 }
 
 /**
- * Render disease distribution pie chart
- * @param {Array} diseases - Disease distribution data
+ * Render disease distribution doughnut chart
+ * @param {Array} diseases - Disease count data
  */
 function renderDiseaseChart(diseases) {
-    const ctx = document.getElementById('diseaseChart');
-    if (!ctx) return;
+    const canvas = document.getElementById('diseaseChart');
+    if (!canvas) return;
 
-    // Destroy existing chart
-    if (diseaseChart) {
-        diseaseChart.destroy();
+    const ctx = canvas.getContext('2d');
+
+    // CRITICAL FIX: Destroy existing chart before creating new one
+    if (diseaseChartInstance) {
+        diseaseChartInstance.destroy();
+        diseaseChartInstance = null;
     }
 
-    const labels = diseases.slice(0, 8).map(d => d.disease);
-    const values = diseases.slice(0, 8).map(d => d.count);
+    // Handle empty data
+    if (!diseases || diseases.length === 0) {
+        diseaseChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['No Data'],
+                datasets: [{
+                    data: [1],
+                    backgroundColor: ['#e5e7eb'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+        return;
+    }
+
+    const topDiseases = diseases.slice(0, 8);
+    const labels = topDiseases.map(d => d.disease);
+    const values = topDiseases.map(d => d.count);
     const colors = [
         '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b',
         '#ef4444', '#06b6d4', '#ec4899', '#84cc16'
     ];
 
-    diseaseChart = new Chart(ctx, {
+    diseaseChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: colors,
-                borderWidth: 0
+                backgroundColor: colors.slice(0, topDiseases.length),
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
@@ -84,8 +111,19 @@ function renderDiseaseChart(diseases) {
                     position: 'right',
                     labels: {
                         boxWidth: 12,
-                        padding: 15,
-                        font: { size: 11 }
+                        padding: 12,
+                        font: { size: 11 },
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return `${context.label}: ${context.parsed} (${percentage}%)`;
+                        }
                     }
                 }
             }
@@ -95,22 +133,46 @@ function renderDiseaseChart(diseases) {
 
 /**
  * Render monthly activity line chart
- * @param {Array} stats - Monthly statistics
+ * @param {Array} stats - Monthly statistics from API
  */
 function renderMonthlyChart(stats) {
-    const ctx = document.getElementById('monthlyChart');
-    if (!ctx) return;
+    const canvas = document.getElementById('monthlyChart');
+    if (!canvas) return;
 
-    // Destroy existing chart
-    if (monthlyChart) {
-        monthlyChart.destroy();
+    const ctx = canvas.getContext('2d');
+
+    // CRITICAL FIX: Destroy existing chart before creating new one
+    if (monthlyChartInstance) {
+        monthlyChartInstance.destroy();
+        monthlyChartInstance = null;
     }
 
+    // Handle empty data
+    if (!stats || stats.length === 0) {
+        monthlyChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['No Data'],
+                datasets: [{
+                    label: 'Predictions',
+                    data: [0],
+                    borderColor: '#3b82f6'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+        return;
+    }
+
+    // Data is already in correct chronological order from backend
     const labels = stats.map(s => s.month);
     const predictions = stats.map(s => s.predictions);
     const appointments = stats.map(s => s.appointments);
 
-    monthlyChart = new Chart(ctx, {
+    monthlyChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -121,7 +183,13 @@ function renderMonthlyChart(stats) {
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 },
                 {
                     label: 'Appointments',
@@ -129,21 +197,61 @@ function renderMonthlyChart(stats) {
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    cornerRadius: 8
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        // Only show whole numbers
+                        stepSize: 1,
+                        callback: function (value) {
+                            if (Math.floor(value) === value) {
+                                return value;
+                            }
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
                 }
             }
         }
@@ -152,17 +260,18 @@ function renderMonthlyChart(stats) {
 
 /**
  * Render recent predictions table
- * @param {Array} predictions - Recent predictions
+ * @param {Array} predictions - Recent prediction data
  */
 function renderRecentPredictionsTable(predictions) {
     const tbody = document.getElementById('recentPredictionsTable');
     if (!tbody) return;
 
-    if (predictions.length === 0) {
+    if (!predictions || predictions.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="4" class="text-center py-8 text-gray-500">
-                    No predictions yet
+                    <i class="fas fa-clipboard-list text-2xl mb-2"></i>
+                    <p>No predictions yet</p>
                 </td>
             </tr>
         `;
@@ -170,22 +279,34 @@ function renderRecentPredictionsTable(predictions) {
     }
 
     tbody.innerHTML = predictions.map(pred => `
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50 transition">
             <td class="px-6 py-4">
                 <div class="flex items-center">
-                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fas fa-user text-primary text-sm"></i>
+                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+                        <span class="text-primary text-xs font-bold">
+                            ${pred.patient_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                        </span>
                     </div>
-                    <span class="font-medium text-gray-800">${pred.patient_name}</span>
+                    <span class="font-medium text-gray-800 text-sm">${pred.patient_name}</span>
                 </div>
             </td>
-            <td class="px-6 py-4 text-gray-800">${pred.disease}</td>
             <td class="px-6 py-4">
-                <span class="px-2 py-1 rounded-full text-xs font-medium ${getConfidenceClass(pred.confidence)}">
-                    ${(pred.confidence * 100).toFixed(1)}%
+                <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                    ${pred.disease}
                 </span>
             </td>
-            <td class="px-6 py-4 text-gray-500 text-sm">${formatDate(pred.date)}</td>
+            <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-12 bg-gray-200 rounded-full h-1.5">
+                        <div class="h-1.5 rounded-full ${pred.confidence >= 0.8 ? 'bg-green-500' : pred.confidence >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}"
+                             style="width: ${(pred.confidence * 100).toFixed(0)}%"></div>
+                    </div>
+                    <span class="text-xs font-medium ${pred.confidence >= 0.8 ? 'text-green-600' : pred.confidence >= 0.5 ? 'text-yellow-600' : 'text-red-600'}">
+                        ${(pred.confidence * 100).toFixed(1)}%
+                    </span>
+                </div>
+            </td>
+            <td class="px-6 py-4 text-gray-500 text-xs">${formatDate(pred.date)}</td>
         </tr>
     `).join('');
 }
