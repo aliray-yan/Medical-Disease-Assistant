@@ -18,6 +18,7 @@ async function loadDoctorDashboard() {
         renderDoctorDashboard(data);
     } catch (error) {
         console.error('Error loading dashboard:', error);
+        renderDoctorDashboardError();
         showToast('Failed to load dashboard data', 'error');
     }
 }
@@ -27,30 +28,51 @@ async function loadDoctorDashboard() {
  * @param {object} data - Dashboard data
  */
 function renderDoctorDashboard(data) {
+    const doctorInfo = data.doctor_info || {};
+
     // Update doctor name
     const doctorName = document.getElementById('doctorName');
     if (doctorName) {
-        doctorName.textContent = `Welcome, ${data.doctor_info.full_name}`;
+        doctorName.textContent = `Welcome, ${doctorInfo.full_name || 'Doctor'}`;
     }
 
     // Update stats
-    document.getElementById('appointmentsToday').textContent = data.appointments_today;
-    document.getElementById('pendingAppointments').textContent = data.pending_appointments;
-    document.getElementById('totalPatients').textContent = data.total_patients;
-    document.getElementById('doctorRating').textContent = data.doctor_info.rating.toFixed(1);
+    document.getElementById('appointmentsToday').textContent = data.appointments_today ?? 0;
+    document.getElementById('pendingAppointments').textContent = data.pending_appointments ?? 0;
+    document.getElementById('totalPatients').textContent = data.total_patients ?? 0;
+    document.getElementById('doctorRating').textContent = Number(doctorInfo.rating || 0).toFixed(1);
 
-    // Render today's schedule
-    renderTodaySchedule(data.upcoming_appointments);
+    // Render upcoming schedule
+    renderTodaySchedule(data.upcoming_appointments || []);
 
     // Render recent patients
-    renderRecentPatients(data.recent_patients);
+    renderRecentPatients(data.recent_patients || []);
+}
+
+function renderDoctorDashboardError() {
+    ['appointmentsToday', 'pendingAppointments', 'totalPatients', 'doctorRating'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = '-';
+    });
+
+    const errorHtml = `
+        <div class="text-center py-8 text-red-500">
+            <i class="fas fa-circle-exclamation text-4xl mb-3"></i>
+            <p>Could not load dashboard data</p>
+        </div>
+    `;
+
+    const todaySchedule = document.getElementById('todaySchedule');
+    const recentPatients = document.getElementById('recentPatients');
+    if (todaySchedule) todaySchedule.innerHTML = errorHtml;
+    if (recentPatients) recentPatients.innerHTML = errorHtml;
 }
 
 /**
  * Render today's schedule
  * @param {Array} appointments - Today's appointments
  */
-function renderTodaySchedule(appointments) {
+function renderTodaySchedule(appointments = []) {
     const container = document.getElementById('todaySchedule');
     if (!container) return;
 
@@ -73,6 +95,7 @@ function renderTodaySchedule(appointments) {
                     </div>
                     <div class="flex-1">
                         <p class="font-medium text-gray-800">${apt.patient_name}</p>
+                        <p class="text-xs text-gray-400">${formatDate(apt.date)}</p>
                         <p class="text-sm text-gray-500">${apt.reason || 'General Consultation'}</p>
                     </div>
                     <span class="px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(apt.status)}">
@@ -95,7 +118,7 @@ function renderTodaySchedule(appointments) {
  * Render recent patients list
  * @param {Array} patients - Recent patients
  */
-function renderRecentPatients(patients) {
+function renderRecentPatients(patients = []) {
     const container = document.getElementById('recentPatients');
     if (!container) return;
 

@@ -57,13 +57,20 @@ async def get_doctor_dashboard(
         Appointment.appointment_time
     ).limit(10).all()
     
-    # Recent patients
-    recent_patient_ids = db.query(Appointment.patient_id).filter(
+    # Recent patients, ordered by each patient's latest appointment with this doctor.
+    recent_patient_rows = db.query(
+        Appointment.patient_id,
+        func.max(Appointment.created_at).label("latest_appointment_created_at")
+    ).filter(
         Appointment.doctor_id == doctor.doctor_id
-    ).order_by(desc(Appointment.created_at)).distinct().limit(10).all()
+    ).group_by(
+        Appointment.patient_id
+    ).order_by(
+        desc(func.max(Appointment.created_at))
+    ).limit(10).all()
     
     recent_patients = []
-    for (patient_id,) in recent_patient_ids:
+    for patient_id, _ in recent_patient_rows:
         patient = db.query(Patient).filter(Patient.patient_id == patient_id).first()
         if patient:
             # Get latest prediction
